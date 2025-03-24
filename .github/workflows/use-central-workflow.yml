@@ -1,0 +1,11 @@
+name: Use Central PR Blocking Workflow
+
+on:
+  pull_request:
+    types: [opened, labeled, unlabeled, synchronize]
+
+jobs:
+  call-reusable-workflow:
+    uses: jheeres-visionplanner/github-workflows/.github/workflows/block-labeled-prs.yml@main
+    with: {}
+    secrets: inherit
