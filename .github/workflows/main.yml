@@ -1,4 +1,4 @@
-name: Block PRs with "Blocked" Label
+name: Block PRs with "do not merge" Label
 on:
   pull_request:
     types: [labeled, unlabeled, synchronize]
@@ -7,10 +7,10 @@ jobs:
   block_merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for "Blocked" label
+      - name: Check for "do not merge" label
         run: |
           LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
-          if echo "$LABELS" | grep -q "Blocked"; then
+          if echo "$LABELS" | grep -q "do not merge"; then
             echo "This PR is blocked and cannot be merged."
             exit 1
           fi
