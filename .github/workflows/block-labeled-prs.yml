@@ -1,0 +1,28 @@
+name: Block PRs with Certain Labels
+
+on:
+  workflow_call:  # This allows other repos to call this workflow
+
+jobs:
+  block-labeled-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          # Get labels on the PR
+          LABELS=$(gh pr view $PR_NUMBER --repo $REPO --json labels -q '.labels[].name')
+
+          # Define labels that should block the PR from merging
+          BLOCKING_LABELS=("Blocked" "Needs Review" "Do Not Merge")
+
+          for label in "${BLOCKING_LABELS[@]}"; do
+            if echo "$LABELS" | grep -q "$label"; then
+              echo "🚨 PR is blocked due to the '$label' label!"
+              exit 1
+            fi
+          done
