@@ -7,7 +7,7 @@ jobs:
   block_merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for "do not merge" label
+      - name: Check for "do not merge"
         run: |
           LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
           if echo "$LABELS" | grep -q "do not merge"; then
