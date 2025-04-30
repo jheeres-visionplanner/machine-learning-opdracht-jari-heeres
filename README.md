@@ -1,5 +1,4 @@
-deep learning course for Hogeschool Utrecht
-==============================
+
 
 This course is the last course in a series of modules for data science.
 This course assumes you have done the introduction in Python and the Data Analyses & Visualisation course https://github.com/raoulg/MADS-DAV
