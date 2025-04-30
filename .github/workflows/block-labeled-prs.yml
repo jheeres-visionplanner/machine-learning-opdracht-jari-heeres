@@ -1,39 +1,23 @@
-name: Block PR if Tasks Are Open
+name: Block merge if PR has open tasks
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-  pull_request_review:
-    types: [submitted, edited, dismissed]
-  issue_comment:
-    types: [created, edited, deleted]
 
 jobs:
   check-tasks:
     runs-on: ubuntu-latest
     steps:
       - name: Check for open tasks in PR body
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
-            const pr = context.payload.pull_request || context.payload.issue?.pull_request;
+            const prBody = context.payload.pull_request.body || "";
 
-            if (!pr) {
-              console.log("Not a pull request event.");
-              return;
-            }
+            const hasOpenTasks = prBody.match(/- \[ \]/); // checks for any unchecked boxes
 
-            const { data: prData } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number
-            });
-
-            const body = prData.body || "";
-            const openTasks = body.match(/- \[ \]/g) || [];
-
-            if (openTasks.length > 0) {
-              core.setFailed(`❌ There are ${openTasks.length} incomplete task(s) in the PR description.`);
+            if (hasOpenTasks) {
+              core.setFailed("❌ PR has open tasks. Please complete or remove them before merging.");
             } else {
-              console.log("✅ All tasks are complete.");
+              console.log("✅ No open tasks found in PR body.");
             }
