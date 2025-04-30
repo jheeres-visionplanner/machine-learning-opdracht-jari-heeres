@@ -3,6 +3,8 @@ name: Block PR if Tasks Are Open
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
   issue_comment:
     types: [created, edited, deleted]
 
