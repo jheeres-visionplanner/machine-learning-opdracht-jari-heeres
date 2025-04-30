@@ -109,7 +109,7 @@ jobs:
             });
             console.log(`Label '${labelName}' added.`);
           # Pass the GitHub token for API authentication
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUBToken }}
 
       # Step 3: Remove the "can't merge because of open task" Label if Check Succeeded
       # This step uses actions/github-script and only runs if task_check succeeded.
@@ -141,4 +141,4 @@ jobs:
               }
             }
           # Pass the GitHub token for API authentication
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUBToken }}
