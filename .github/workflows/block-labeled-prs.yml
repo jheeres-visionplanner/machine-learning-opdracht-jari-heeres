@@ -28,7 +28,7 @@ jobs:
             const pull_number = pr.number;
             const { owner, repo } = context.repo;
 
-            // Get full PR data
+            // Get PR body
             const { data: prData } = await github.rest.pulls.get({
               owner,
               repo,
@@ -37,37 +37,38 @@ jobs:
 
             const body = prData.body || "";
             const hasOpenTasks = /- \[ \]/.test(body);
-            const labelName = "blocked";
+            const labelName = "Blocked by task";
 
+            // Get current labels on the PR
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
               owner,
               repo,
               issue_number: pull_number,
             });
 
-            const hasBlockedLabel = labels.some(label => label.name === labelName);
+            const hasLabel = labels.some(label => label.name === labelName);
 
             if (hasOpenTasks) {
               core.setFailed("❌ PR has open tasks. Please complete all tasks before merging.");
 
-              if (!hasBlockedLabel) {
+              if (!hasLabel) {
                 await github.rest.issues.addLabels({
                   owner,
                   repo,
                   issue_number: pull_number,
                   labels: [labelName],
                 });
-                console.log("🚫 'blocked' label added.");
+                console.log(`🚫 '${labelName}' label added.`);
               }
             } else {
               console.log("✅ All tasks are complete.");
-              if (hasBlockedLabel) {
+              if (hasLabel) {
                 await github.rest.issues.removeLabel({
                   owner,
                   repo,
                   issue_number: pull_number,
                   name: labelName,
                 });
-                console.log("🧹 'blocked' label removed.");
+                console.log(`🧹 '${labelName}' label removed.`);
               }
             }
