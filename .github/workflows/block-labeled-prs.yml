@@ -19,38 +19,43 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request || context.payload.issue?.pull_request;
+            if (!pr) return;
 
-            if (!pr) {
-              console.log("Not a pull request event.");
-              return;
+            const { owner, repo } = context.repo;
+            const pull_number = pr.number;
+            const labelName = "Blocked by task";
+            const labelColor = "d73a4a"; // GitHub standard red
+            const labelDesc  = "PR is blocked because of an open task";
+
+            // 1. Ensure the repo label exists
+            const { data: repoLabels } = await github.rest.issues.listLabelsForRepo({
+              owner, repo, per_page: 100
+            });
+            if (!repoLabels.some(l => l.name === labelName)) {
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: labelName,
+                color: labelColor,
+                description: labelDesc
+              });
+              console.log(`🆕 Created repo label '${labelName}'.`);
             }
 
-            const pull_number = pr.number;
-            const { owner, repo } = context.repo;
-
-            // Get PR body
+            // 2. Fetch latest PR body & check for open tasks
             const { data: prData } = await github.rest.pulls.get({
-              owner,
-              repo,
-              pull_number,
+              owner, repo, pull_number
             });
+            const hasOpenTasks = /- \[ \]/.test(prData.body || "");
 
-            const body = prData.body || "";
-            const hasOpenTasks = /- \[ \]/.test(body);
-            const labelName = "Blocked by task";
-
-            // Get current labels on the PR
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner,
-              repo,
-              issue_number: pull_number,
+            // 3. Check if PR already has the label
+            const { data: issueLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: pull_number
             });
-
-            const hasLabel = labels.some(label => label.name === labelName);
+            const hasLabel = issueLabels.some(l => l.name === labelName);
 
             if (hasOpenTasks) {
               core.setFailed("❌ PR has open tasks. Please complete all tasks before merging.");
-
               if (!hasLabel) {
                 await github.rest.issues.addLabels({
                   owner,
