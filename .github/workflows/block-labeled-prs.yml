@@ -1,146 +1,23 @@
-name: Check for Open Tasks and Label PR
+name: Block merge if PR has open tasks
 
-# This workflow runs on pull request events
 on:
   pull_request:
-    types: [opened, synchronize, edited]
-  issue_comment:
-    types: [created]
-
-
-# Give the workflow necessary permissions to write labels
-permissions:
-  issues: write # Required to add/remove labels on PRs (PRs are issues in the API)
-  contents: read # Default permission, good practice to include if needed (though not strictly for labeling)
+    types: [opened, edited, synchronize, reopened]
 
 jobs:
-  check_tasks_and_label:
-    name: Check Tasks & Label
+  check-tasks:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Check the PR Body for Open Tasks
-      # This step remains largely the same, but we give it an 'id'
-      # so we can reference its outcome (success/failure) later.
-      - name: Check PR Body for Open Tasks
-        id: task_check # Assign an ID to this step
-        run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
-
-          # Regex to find unchecked task list items:
-          # - ^\s*      : Start of line, followed by optional whitespace
-          # - [-\*\+] : A list marker (- or * or +)
-          # - \s*      : Optional whitespace
-          # - \[ \]    : The literal characters "[ ]"
-          TASK_PATTERN='^\s*[-\*\+]\s*\[ \]'
-
-          echo "Checking PR body for open tasks..."
-
-          # Print body content only if it's not null/empty for better logs
-          if [ -z "$PR_BODY" ]; then
-              echo "<Empty PR Body>"
-          else
-              echo "--- PR Body ---"
-              echo "$PR_BODY"
-              echo "---------------"
-          fi
-
-          # Use grep -q to search quietly.
-          # If grep finds the pattern (exit status 0), it means there's an open task.
-          # In that case, we want the job to fail (exit 1).
-          # If grep does NOT find the pattern (exit status 1 or 2), it means no open tasks.
-          # In that case, we want the job to pass (exit 0).
-
-          # Pipe the PR_BODY. If empty, grep on empty string correctly returns non-zero.
-          if echo "$PR_BODY" | grep -q -E "$TASK_PATTERN"; then
-            echo "FAILURE: Found unchecked task list items in the PR description!"
-            echo "Please ensure all tasks (items formatted like '- [ ] Task') are checked before merging."
-            exit 1 # Fail the job
-          else
-            echo "SUCCESS: No unchecked task list items found in the PR description."
-            exit 0 # Pass the job
-          fi
-        # Explicitly use bash for reliable regex and control flow
-        shell: bash
-
-      # Step 2: Add the "can't merge because of open task" Label if Check Failed
-      # This step uses actions/github-script and only runs if task_check failed.
-      - name: Add "can't merge because of open task" Label
-        # Only run this step if the previous step ('task_check') concluded as 'failure'
-        if: steps.task_check.conclusion == 'failure'
+      - name: Check for open tasks in PR body
         uses: actions/github-script@v7
         with:
           script: |
-            const labelName = 'can\'t merge because of open task'; // Define the label name (escape apostrophe)
-            const labelColor = 'd93f0b'; // Define a hex color for the label (e.g., a shade of red/orange)
-            const { owner, repo, issue_number } = context.issue; // Get context details
+            const prBody = context.payload.pull_request.body || "";
 
-            try {
-              // Attempt to get the label to see if it already exists
-              await github.rest.issues.getLabel({
-                owner,
-                repo,
-                name: labelName
-              });
-              console.log(`Label '${labelName}' already exists.`);
-            } catch (error) {
-              if (error.status === 404) {
-                // If the label doesn't exist (404 error), create it
-                console.log(`Label '${labelName}' does not exist. Creating it.`);
-                await github.rest.issues.createLabel({
-                  owner,
-                  repo,
-                  name: labelName,
-                  color: labelColor,
-                  description: 'This PR has open tasks that need to be completed before merging.' // Optional description
-                });
-                console.log(`Label '${labelName}' created.`);
-              } else {
-                // Re-throw any other unexpected errors
-                throw error;
-              }
+            const hasOpenTasks = prBody.match(/- \[ \]/); // checks for any unchecked boxes
+
+            if (hasOpenTasks) {
+              core.setFailed("❌ PR has open tasks. Please complete or remove them before merging.");
+            } else {
+              console.log("✅ No open tasks found in PR body.");
             }
-
-            // Add the label to the current Pull Request
-            console.log(`Adding label '${labelName}' to PR #${issue_number}`);
-            await github.rest.issues.addLabels({
-              owner,
-              repo,
-              issue_number: issue_number,
-              labels: [labelName] // Array of label names to add
-            });
-            console.log(`Label '${labelName}' added.`);
-          # Pass the GitHub token for API authentication
-          github-token: ${{ secrets.GITHUBToken }}
-
-      # Step 3: Remove the "can't merge because of open task" Label if Check Succeeded
-      # This step uses actions/github-script and only runs if task_check succeeded.
-      - name: Remove "can't merge because of open task" Label
-        # Only run this step if the previous step ('task_check') concluded as 'success'
-        if: steps.task_check.conclusion == 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const labelName = 'can\'t merge because of open task'; // Define the label name
-            const { owner, repo, issue_number } = context.issue; // Get context details
-
-            try {
-              // Attempt to remove the label from the current Pull Request
-              await github.rest.issues.removeLabel({
-                owner,
-                repo,
-                issue_number: issue_number,
-                name: labelName // Name of the label to remove
-              });
-              console.log(`Label '${labelName}' removed from PR #${issue_number}.`);
-            } catch (error) {
-              // If the label was not on the issue (404 error), that's expected and fine.
-              if (error.status === 404) {
-                 console.log(`Label '${labelName}' was not on PR #${issue_number}. Nothing to remove.`);
-              } else {
-                // Re-throw any other unexpected errors
-                throw error;
-              }
-            }
-          # Pass the GitHub token for API authentication
-          github-token: ${{ secrets.GITHUBToken }}
