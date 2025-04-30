@@ -16,10 +16,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prBody = context.payload.pull_request.body || "";
-
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              console.log("No pull request found in the context. Skipping task check.");
+              return;
+            }
+      
+            const prBody = pr.body || "";
             const hasOpenTasks = prBody.match(/- \[ \]/); // checks for any unchecked boxes
-
+      
             if (hasOpenTasks) {
               core.setFailed("❌ PR has open tasks. Please complete or remove them before merging.");
             } else {
