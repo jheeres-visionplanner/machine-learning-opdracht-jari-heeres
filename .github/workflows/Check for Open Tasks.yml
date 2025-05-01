@@ -26,26 +26,59 @@ jobs:
             const body = pr.data.body || "";
             core.setOutput("body", body);
 
-      - name: Check for open tasks in PR description
+      - name: Check for open tasks
+        id: taskcheck
         run: |
           echo "${{ steps.pr.outputs.body }}" > pr_body.md
-          if grep -q "\- \[ \]" pr_body.md; then
-            echo "❌ Open tasks found in PR description:"
-            grep "\- \[ \]" pr_body.md
-            exit 1
-          else
-            echo "✅ No open tasks in PR description."
-          fi
-
-      - name: Check for open tasks in commits
-        run: |
           git fetch origin ${{ github.event.pull_request.base.ref }}
           git log origin/${{ github.event.pull_request.base.ref }}..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
 
-          if grep -q "\- \[ \]" commit_messages.txt; then
-            echo "❌ Open tasks found in commit messages:"
-            grep "\- \[ \]" commit_messages.txt
-            exit 1
+          has_open_tasks=false
+
+          if grep -q "\- \[ \]" pr_body.md || grep -q "\- \[ \]" commit_messages.txt; then
+            has_open_tasks=true
+            echo "Open tasks found."
           else
-            echo "✅ No open tasks in commit messages."
+            echo "No open tasks."
           fi
+
+          echo "has_open_tasks=$has_open_tasks" >> $GITHUB_OUTPUT
+
+      - name: Add or remove 'blocked by open task' label
+        uses: actions/github-script@v7
+        if: always()  # Ensure this runs regardless of earlier step failures
+        with:
+          script: |
+            const hasOpenTasks = "${{ steps.taskcheck.outputs.has_open_tasks }}" === "true";
+            const labelName = "blocked by open task";
+
+            const { owner, repo } = context.repo;
+            const prNumber = context.issue.number;
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: prNumber
+            });
+
+            const hasLabel = labels.some(label => label.name === labelName);
+
+            if (hasOpenTasks && !hasLabel) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: [labelName]
+              });
+              console.log(`Label '${labelName}' added.`);
+            } else if (!hasOpenTasks && hasLabel) {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: prNumber,
+                name: labelName
+              });
+              console.log(`Label '${labelName}' removed.`);
+            } else {
+              console.log("No label change needed.");
+            }
