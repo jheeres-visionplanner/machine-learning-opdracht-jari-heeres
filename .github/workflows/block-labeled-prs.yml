@@ -5,37 +5,8 @@ on:
     types: [opened, labeled, unlabeled, synchronize, reopened]
 
 jobs:
-  create_label:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create "do not merge" label if it doesn't exist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          LABEL_NAME="do not merge"
-          LABEL_COLOR="ff0000" # Red
-          
-          # Check if the label exists
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/$REPO/labels/$(echo $LABEL_NAME | sed 's/ /%20/g'))
-
-          if [ "$STATUS" -eq 200 ]; then
-            echo "Label '$LABEL_NAME' already exists."
-          else
-            echo "Creating label '$LABEL_NAME'..."
-            curl -s -X POST \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              https://api.github.com/repos/$REPO/labels \
-              -d "{\"name\": \"$LABEL_NAME\", \"color\": \"$LABEL_COLOR\", \"description\": \"Prevents merging when applied\"}"
-          fi
-
   block_merge:
     runs-on: ubuntu-latest
-    needs: create_label
     steps:
       - name: Fail if "do not merge" label is present
         run: |
