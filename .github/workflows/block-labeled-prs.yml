@@ -1,16 +1,41 @@
 name: Block PRs with "do not merge"
+
 on:
   pull_request:
-    types: [labeled, unlabeled, synchronize]
+    types: [opened, labeled, unlabeled, synchronize, reopened]
 
 jobs:
-  block_merge:
+  ensure_label:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for "do not merge"
+      - name: Check and add "do not merge" label if missing
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+
+          if echo "$LABELS" | grep -q "do not merge"; then
+            echo '"do not merge" label is already present.'
+          else
+            echo 'Adding "do not merge" label...'
+            curl -s -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/$REPO/issues/$PR_NUMBER/labels \
+              -d '{"labels": ["do not merge"]}'
+          fi
+
+  block_merge:
+    runs-on: ubuntu-latest
+    needs: ensure_label
+    steps:
+      - name: Fail if "do not merge" label is present
         run: |
           LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
           if echo "$LABELS" | grep -q "do not merge"; then
             echo "This PR is blocked and cannot be merged."
             exit 1
-          fi
+          else
+            echo "No blocking labels found."
