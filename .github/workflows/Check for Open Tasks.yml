@@ -1,93 +1,51 @@
 name: Check for Open Tasks
-
-on:
-  pull_request:
-    types: [opened, edited, synchronize, reopened]
-
-permissions:
-  pull-requests: write
-  issues: write
-
-jobs:
-  check-tasks:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get PR body
-        id: pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-
-            const body = pr.data.body || "";
-            core.setOutput("body", body);
-
-      - name: Detect open tasks
-        id: taskcheck
-        run: |
-          echo "${{ steps.pr.outputs.body }}" > pr_body.md
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          git log origin/${{ github.event.pull_request.base.ref }}..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
-
-          if grep -q "\- \[ \]" pr_body.md || grep -q "\- \[ \]" commit_messages.txt; then
-            echo "has_open_tasks=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_open_tasks=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Fail if open tasks are present
-        if: steps.taskcheck.outputs.has_open_tasks == 'true'
-        run: |
-          echo "❌ Open tasks found. Blocking merge."
-          exit 1
-
-  label-sync:
-    needs: check-tasks
-    runs-on: ubuntu-latest
-    if: always()  # Always run, even if check-tasks failed
-
-    steps:
-      - name: Add or remove 'blocked by open task' label
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const labelName = "blocked by open task";
-            const { owner, repo } = context.repo;
-            const prNumber = context.issue.number;
-
-            const hasOpenTasks = "${{ needs.check-tasks.outputs.taskcheck.outputs.has_open_tasks }}" === "true";
-
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner,
-              repo,
-              issue_number: prNumber
-            });
-
-            const hasLabel = labels.some(label => label.name === labelName);
-
-            if (hasOpenTasks && !hasLabel) {
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number: prNumber,
-                labels: [labelName]
-              });
-              console.log(`Label '${labelName}' added.`);
-            } else if (!hasOpenTasks && hasLabel) {
-              await github.rest.issues.removeLabel({
-                owner,
-                repo,
-                issue_number: prNumber,
-                name: labelName
-              });
-              console.log(`Label '${labelName}' removed.`);
-            } else {
-              console.log("No l
+ 
+ on:
+   pull_request:
+     types: [opened, edited, synchronize, reopened]
+ 
+ jobs:
+   check-tasks:
+     runs-on: ubuntu-latest
+ 
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4
+ 
+       - name: Get PR body
+         id: pr
+         uses: actions/github-script@v7
+         with:
+           script: |
+             const pr = await github.rest.pulls.get({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               pull_number: context.issue.number
+             });
+ 
+             const body = pr.data.body || "";
+             core.setOutput("body", body);
+ 
+       - name: Check for open tasks in PR description
+         run: |
+           echo "${{ steps.pr.outputs.body }}" > pr_body.md
+           if grep -q "\- \[ \]" pr_body.md; then
+             echo "❌ Open tasks found in PR description:"
+             grep "\- \[ \]" pr_body.md
+             exit 1
+           else
+             echo "✅ No open tasks in PR description."
+           fi
+ 
+       - name: Check for open tasks in commits
+         run: |
+           git fetch origin ${{ github.event.pull_request.base.ref }}
+           git log origin/${{ github.event.pull_request.base.ref }}..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
+ 
+           if grep -q "\- \[ \]" commit_messages.txt; then
+             echo "❌ Open tasks found in commit messages:"
+             grep "\- \[ \]" commit_messages.txt
+             exit 1
+           else
+             echo "✅ No open tasks in commit messages."
+           fi
