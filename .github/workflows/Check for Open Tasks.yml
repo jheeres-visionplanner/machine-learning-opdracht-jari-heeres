@@ -1,10 +1,12 @@
 name: Check for Open Tasks
  
- on:
-   pull_request:
-     types: [opened, edited, synchronize, reopened]
- 
- jobs:
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  issue_comment:
+    types: [created, deleted, edited]
+    
+jobs:
    check-tasks:
      runs-on: ubuntu-latest
  
