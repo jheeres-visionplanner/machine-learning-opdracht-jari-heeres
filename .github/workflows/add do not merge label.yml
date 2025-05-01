@@ -1,0 +1,41 @@
+name: Add "Do Not Merge" Label
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  label_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure "do not merge" label exists and apply it
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labelName = "do not merge";
+            const labelColor = "d73a4a"; // red
+            const labelExists = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            }).then(res => res.data.find(label => label.name.toLowerCase() === labelName));
+
+            if (!labelExists) {
+              console.log(`Label "${labelName}" does not exist. Creating it...`);
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: labelName,
+                color: labelColor,
+                description: "Prevents merging until issues are resolved"
+              });
+            } else {
+              console.log(`Label "${labelName}" already exists.`);
+            }
+
+            // Apply label to the pull request
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [labelName],
+            });
