@@ -5,26 +5,33 @@ on:
     types: [opened, labeled, unlabeled, synchronize, reopened]
 
 jobs:
-  ensure_label:
+jobs:
+  create_label:
     runs-on: ubuntu-latest
     steps:
-      - name: Check and add "do not merge" label if missing
+      - name: Create "do not merge" label if it doesn't exist
         env:
-          GITHUB_TOKEN: ${{ secrets.READTOKON }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          LABELS=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH")
+          LABEL_NAME="do not merge"
+          LABEL_COLOR="ff0000" # Red
+          
+          # Check if the label exists
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/$REPO/labels/$(echo $LABEL_NAME | sed 's/ /%20/g'))
 
-          if echo "$LABELS" | grep -q "do not merge"; then
-            echo '"do not merge" label is already present.'
+          if [ "$STATUS" -eq 200 ]; then
+            echo "Label '$LABEL_NAME' already exists."
           else
-            echo 'Adding "do not merge" label...'
+            echo "Creating label '$LABEL_NAME'..."
             curl -s -X POST \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
-              https://api.github.com/repos/$REPO/issues/$PR_NUMBER/labels \
-              -d '{"labels": ["do not merge"]}'
+              https://api.github.com/repos/$REPO/labels \
+              -d "{\"name\": \"$LABEL_NAME\", \"color\": \"$LABEL_COLOR\", \"description\": \"Prevents merging when applied\"}"
           fi
 
   block_merge:
