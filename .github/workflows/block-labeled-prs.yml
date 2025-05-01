@@ -2,7 +2,7 @@ name: Block PRs with "do not merge"
 
 on:
   pull_request:
-    types: [opened, labeled, unlabeled, synchronize, reopened]
+    types: [labeled, unlabeled, synchronize]
 
 jobs:
   block_merge:
