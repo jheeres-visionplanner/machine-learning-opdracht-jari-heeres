@@ -35,7 +35,7 @@ jobs:
 
   block_merge:
     runs-on: ubuntu-latest
-    needs: ensure_label
+    needs: create_label
     steps:
       - name: Fail if "do not merge" label is present
         run: |
