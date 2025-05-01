@@ -1,52 +1,33 @@
-name: Block PR if Tasks Exist in Comments
+name: Trigger Task Check on Comment Edit
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   issue_comment:
     types: [created, edited]
 
 jobs:
-  check-tasks:
-    if: github.event_name == 'pull_request' || github.event.issue.pull_request != null
-    name: Check for Unchecked Tasks
+  retrigger-task-check:
+    if: github.event.issue.pull_request != null
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set PR Number
-        id: vars
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "pr_number=${{ github.event.number }}" >> $GITHUB_OUTPUT
-          else
-            echo "pr_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Fetch all comments
+      - name: Re-dispatch PR Check Workflow
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = process.env.PR_NUMBER;
-            const { data: comments } = await github.rest.issues.listComments({
+            const prNumber = context.payload.issue.number;
+
+            // Get the PR details to find the head SHA
+            const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: prNumber,
-              per_page: 100
+              pull_number: prNumber
             });
 
-            function extractUncheckedTasks(text) {
-              return (text.match(/- \[ \] .*/g) || []);
-            }
-
-            const allUncheckedTasks = comments.flatMap(comment => extractUncheckedTasks(comment.body));
-
-            if (allUncheckedTasks.length > 0) {
-              console.log("Found unchecked tasks:");
-              allUncheckedTasks.forEach(task => console.log(task));
-              core.setFailed(`PR blocked: ${allUncheckedTasks.length} unchecked task(s) found.`);
-            } else {
-              console.log("No unchecked tasks found. PR is clear to merge.");
-            }
-        env:
-          PR_NUMBER: ${{ steps.vars.outputs.pr_number }}
-          
+            // Trigger a new check by dispatching a `pull_request` event
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: "Check for Unchecked Tasks",
+              head_sha: pr.head.sha,
+              status: "queued"
+            });
