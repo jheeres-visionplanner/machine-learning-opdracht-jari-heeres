@@ -1,4 +1,4 @@
-name: Add "Do Not Merge" Label
+name: Ensure and Apply "Do Not Merge" Label
 
 on:
   pull_request:
@@ -8,34 +8,31 @@ jobs:
   label_pr:
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure "do not merge" label exists and apply it
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const labelName = "do not merge";
-            const labelColor = "d73a4a"; // red
-            const labelExists = await github.rest.issues.listLabelsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            }).then(res => res.data.find(label => label.name.toLowerCase() === labelName));
+      - name: Create and apply label if it doesn't exist
+        run: |
+          LABEL_NAME="do not merge"
+          LABEL_COLOR="d73a4a"
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
 
-            if (!labelExists) {
-              console.log(`Label "${labelName}" does not exist. Creating it...`);
-              await github.rest.issues.createLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name: labelName,
-                color: labelColor,
-                description: "Prevents merging until issues are resolved"
-              });
-            } else {
-              console.log(`Label "${labelName}" already exists.`);
-            }
+          # Check if label exists
+          LABEL_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.READTOKON }}" \
+            https://api.github.com/repos/$REPO/labels)
 
-            // Apply label to the pull request
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              labels: [labelName],
-            });
+          if ! echo "$LABEL_RESPONSE" | jq -e --arg NAME "$LABEL_NAME" '.[] | select(.name == $NAME)' > /dev/null; then
+            echo "Label does not exist. Creating it..."
+            curl -X POST -H "Authorization: token ${{ secrets.READTOKON }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/$REPO/labels \
+              -d "{\"name\":\"$LABEL_NAME\", \"color\":\"$LABEL_COLOR\", \"description\":\"Prevents merging until issues are resolved\"}"
+          else
+            echo "Label already exists."
+          fi
+
+          # Add the label to the pull request
+          curl -X POST -H "Authorization: token ${{ secrets.READTOKON }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/$REPO/issues/$PR_NUMBER/labels \
+            -d "{\"labels\": [\"$LABEL_NAME\"]}"
+        env:
+          GH_TOKEN: ${{ secrets.READTOKON }}
