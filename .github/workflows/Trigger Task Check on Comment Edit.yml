@@ -1,0 +1,33 @@
+name: Trigger Task Check on Comment Edit
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  retrigger-task-check:
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Re-dispatch PR Check Workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.issue.number;
+
+            // Get the PR details to find the head SHA
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            // Trigger a new check by dispatching a `pull_request` event
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: "Check for Unchecked Tasks",
+              head_sha: pr.head.sha,
+              status: "queued"
+            });
