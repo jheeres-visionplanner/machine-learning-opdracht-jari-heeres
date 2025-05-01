@@ -1,4 +1,4 @@
-name: Ensure and Apply "Do Not Merge" Label
+name: Ensure and Apply "blocked by open task" Label
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Create and apply label if it doesn't exist
         run: |
-          LABEL_NAME="do not merge"
+          LABEL_NAME="blocked by open task"
           LABEL_COLOR="d73a4a"
           REPO="${{ github.repository }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
@@ -24,7 +24,7 @@ jobs:
             curl -X POST -H "Authorization: token ${{ secrets.READTOKON }}" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/$REPO/labels \
-              -d "{\"name\":\"$LABEL_NAME\", \"color\":\"$LABEL_COLOR\", \"description\":\"Prevents merging until issues are resolved\"}"
+              -d "{\"name\":\"$LABEL_NAME\", \"color\":\"$LABEL_COLOR\", \"description\":\"This pr is blocked because there is a task that is still open\"}"
           else
             echo "Label already exists."
           fi
