@@ -28,11 +28,5 @@ jobs:
           else
             echo "Label already exists."
           fi
-
-          # Add the label to the pull request
-          curl -X POST -H "Authorization: token ${{ secrets.READTOKON }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/$REPO/issues/$PR_NUMBER/labels \
-            -d "{\"labels\": [\"$LABEL_NAME\"]}"
         env:
           GH_TOKEN: ${{ secrets.READTOKON }}
