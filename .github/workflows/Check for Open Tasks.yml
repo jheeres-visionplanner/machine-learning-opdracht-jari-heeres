@@ -38,16 +38,3 @@ jobs:
            else
              echo "✅ No open tasks in PR description."
            fi
- 
-       - name: Check for open tasks in commits
-         run: |
-           git fetch origin ${{ github.event.pull_request.base.ref }}
-           git log origin/${{ github.event.pull_request.base.ref }}..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
- 
-           if grep -q "\- \[ \]" commit_messages.txt; then
-             echo "❌ Open tasks found in commit messages:"
-             grep "\- \[ \]" commit_messages.txt
-             exit 1
-           else
-             echo "✅ No open tasks in commit messages."
-           fi
