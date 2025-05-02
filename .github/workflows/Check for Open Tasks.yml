@@ -3,8 +3,8 @@ name: Check for Open Tasks
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
-  issue_comment:
-    types: [created, deleted, edited]
+  pull_request_review:
+    types: [edited, dismissed,submitted]
     
 jobs:
    check-tasks:
