@@ -1,53 +1,59 @@
 name: Check for Open Tasks
- 
+
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
   issue_comment:
-    types: [created, edited,deleted]
-    
+    types: [created, edited, deleted]
+
 jobs:
-   check-tasks:
-     runs-on: ubuntu-latest
- 
-     steps:
-       - name: Checkout code
-         uses: actions/checkout@v4
- 
-       - name: Get PR body
-         id: pr
-         uses: actions/github-script@v7
-         with:
-           script: |
-             const pr = await github.rest.pulls.get({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               pull_number: context.issue.number
-             });
- 
-             const body = pr.data.body || "";
-             core.setOutput("body", body);
- 
-       - name: Check for open tasks in PR description
-         run: |
-           echo "${{ steps.pr.outputs.body }}" > pr_body.md
-           if grep -q "\- \[ \]" pr_body.md; then
-             echo "❌ Open tasks found in PR description:"
-             grep "\- \[ \]" pr_body.md
-             exit 1
-           else
-             echo "✅ No open tasks in PR description."
-           fi
- 
-       - name: Check for open tasks in commits
-         run: |
-           git fetch origin ${{ github.event.pull_request.base.ref }}
-           git log origin/${{ github.event.pull_request.base.ref }}..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
- 
-           if grep -q "\- \[ \]" commit_messages.txt; then
-             echo "❌ Open tasks found in commit messages:"
-             grep "\- \[ \]" commit_messages.txt
-             exit 1
-           else
-             echo "✅ No open tasks in commit messages."
-           fi
+  check-tasks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get PR body
+        if: github.event_name == 'pull_request'
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            const body = pr.data.body || "";
+            core.setOutput("body", body);
+
+      - name: Set BASE_REF environment variable
+        if: github.event_name == 'pull_request'
+        run: echo "BASE_REF=${{ github.event.pull_request.base.ref }}" >> $GITHUB_ENV
+
+      - name: Check for open tasks in PR description
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "${{ steps.pr.outputs.body }}" > pr_body.md
+          if grep -q "\- \[ \]" pr_body.md; then
+            echo "❌ Open tasks found in PR description:"
+            grep "\- \[ \]" pr_body.md
+            exit 1
+          else
+            echo "✅ No open tasks in PR description."
+          fi
+
+      - name: Check for open tasks in commits
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin $BASE_REF
+          git log origin/$BASE_REF..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
+
+          if grep -q "\- \[ \]" commit_messages.txt; then
+            echo "❌ Open tasks found in commit messages:"
+            grep "\- \[ \]" commit_messages.txt
+            exit 1
+          else
+            echo "✅ No open tasks in commit messages."
+          fi
