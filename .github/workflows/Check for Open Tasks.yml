@@ -29,7 +29,7 @@ jobs:
             core.setOutput("body", body);
 
       - name: Set BASE_REF environment variable
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'issue_comment'
         run: echo "BASE_REF=${{ github.event.pull_request.base.ref }}" >> $GITHUB_ENV
 
       - name: Check for open tasks in PR description
@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Check for open tasks in commits
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'issue_comment'
         run: |
           git fetch origin $BASE_REF
           git log origin/$BASE_REF..HEAD --pretty=format:"%s%n%b" > commit_messages.txt
